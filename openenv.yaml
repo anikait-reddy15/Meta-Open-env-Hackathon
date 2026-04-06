@@ -1,0 +1,10 @@
+name: smart-energy-grid-env
+version: "1.0.0"
+description: "A real-world IoT environment where an agent monitors smart energy meters, resolves grid faults, and rebalances power distribution."
+tasks:
+  - name: task_1_restart_meter
+    description: "Easy: Identify an offline meter from the logs and issue a restart command."
+  - name: task_2_patch_firmware
+    description: "Medium: Diagnose a firmware mismatch across a subnet and apply a patch."
+  - name: task_3_grid_rebalance
+    description: "Hard: Analyze a multi-node power surge and reroute power to stabilize the grid."
