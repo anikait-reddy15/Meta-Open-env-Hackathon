@@ -1,16 +1,17 @@
 from src.models import Observation, Action, Reward, GridState
+from src.tasks.task1_easy import Task1Easy
+from src.tasks.task2_medium import Task2Medium
+from src.tasks.task3_hard import Task3Hard
 from typing import Tuple
 
 class GridEnvironment:
-    """
-    Simulates a smart energy meter grid.
-    Tasks:
-    1 (Easy): Restart an offline meter based on logs.
-    2 (Medium): Apply a firmware patch to a subnet.
-    3 (Hard): Reroute power during a grid surge.
-    """
     def __init__(self):
         self.max_steps = 15
+        self.task_graders = {
+            1: Task1Easy(),
+            2: Task2Medium(),
+            3: Task3Hard()
+        }
         self._initialize_state()
 
     def _initialize_state(self):
@@ -26,7 +27,6 @@ class GridEnvironment:
         }
 
     def reset(self) -> Observation:
-        """Resets the environment to a clean, initial state."""
         self._initialize_state()
         return Observation(
             system_logs="[WARN] Connection timeout from METER-042 at Substation Alpha. Status: OFFLINE.",
@@ -35,7 +35,6 @@ class GridEnvironment:
         )
 
     def state(self) -> GridState:
-        """Returns the internal state variables without advancing the simulation."""
         alarms = []
         if self.task_level == 1: alarms.append("METER_OFFLINE")
         if self.task_level == 2: alarms.append("FIRMWARE_MISMATCH")
@@ -49,56 +48,19 @@ class GridEnvironment:
         )
 
     def step(self, action: Action) -> Tuple[Observation, Reward, bool, dict]:
-        """Applies the agent's action, calculates deterministic reward, and transitions state."""
         self.current_step += 1
-        reward_score = 0.0
-        msg = "Action registered."
-        obs_logs = ""
-        obs_output = "Command failed or unrecognized."
+        
+        # Route the action to the correct isolated task grader
+        grader = self.task_graders[self.task_level]
+        reward_score, msg, obs_logs, obs_output = grader.evaluate(action, self.state_data)
 
-        # TASK 1: EASY - Restart the offline meter
-        if self.task_level == 1:
-            if action.command == "RESTART" and action.target_meter_id == "METER-042":
-                reward_score = 1.0
-                self.task_level = 2
-                self.state_data["meters_online"] = 100
-                msg = "Task 1 Complete: Meter restarted."
-                obs_logs = "[INFO] METER-042 online. [WARN] Subnet Beta running deprecated firmware v1.0."
-                obs_output = "SUCCESS: RESTART executed."
-            elif action.command == "QUERY_LOGS":
-                # Partial progress reward
-                reward_score = 0.2
-                msg = "Logs queried successfully."
-                obs_logs = "[WARN] Connection timeout from METER-042. Needs RESTART."
-                obs_output = "SUCCESS: Logs retrieved."
+        # Advance task level if completed
+        if reward_score == 1.0:
+            if self.task_level < 3:
+                self.task_level += 1
             else:
-                obs_logs = "[WARN] Connection timeout from METER-042 at Substation Alpha."
-
-        # TASK 2: MEDIUM - Patch Firmware
-        elif self.task_level == 2:
-            if action.command == "PATCH" and action.payload == "v2.0":
-                reward_score = 1.0
-                self.task_level = 3
-                self.state_data["subnet_beta_patched"] = True
-                msg = "Task 2 Complete: Firmware patched."
-                obs_logs = "[INFO] Subnet Beta updated. [CRITICAL] Sudden power surge detected on Main Line!"
-                obs_output = "SUCCESS: PATCH applied."
-            else:
-                obs_logs = "[WARN] Subnet Beta running deprecated firmware v1.0. Requires PATCH with payload v2.0."
-
-        # TASK 3: HARD - Reroute Grid
-        elif self.task_level == 3:
-            if action.command == "REROUTE" and action.target_meter_id == "ALL":
-                reward_score = 1.0
                 self.done = True
-                self.state_data["grid_stabilized"] = True
-                msg = "Task 3 Complete: Grid stabilized."
-                obs_logs = "[INFO] Grid power rebalanced. All systems normal."
-                obs_output = "SUCCESS: REROUTE executed."
-            else:
-                obs_logs = "[CRITICAL] Sudden power surge detected on Main Line! Requires immediate REROUTE targeting ALL."
 
-        # Check termination condition
         if self.current_step >= self.max_steps:
             self.done = True
             msg = "Max steps reached. Simulation terminated."
